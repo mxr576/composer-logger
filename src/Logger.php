@@ -90,17 +90,27 @@ final class Logger extends AbstractLogger
      * @return string
      *
      * @see https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-3-logger-interface.md#12-message
+     * @see https://github.com/symfony/console/blob/3.4/Logger/ConsoleLogger.php#L108-L128
      */
     private function buildMessage(string $message, array $context): string
     {
-        $replace = [];
+        if (false === strpos($message, '{')) {
+            return $message;
+        }
+
+        $replacements = [];
         foreach ($context as $key => $val) {
-            // Check that the value can be casted to string.
-            if (!is_array($val) && (!is_object($val) || method_exists($val, '__toString'))) {
-                $replace['{' . $key . '}'] = $val;
+            if (null === $val || is_scalar($val) || (\is_object($val) && method_exists($val, '__toString'))) {
+                $replacements["{{$key}}"] = $val;
+            } elseif ($val instanceof \DateTimeInterface) {
+                $replacements["{{$key}}"] = $val->format(\DateTime::RFC3339);
+            } elseif (\is_object($val)) {
+                $replacements["{{$key}}"] = '[object ' . \get_class($val) . ']';
+            } else {
+                $replacements["{{$key}}"] = '[' . \gettype($val) . ']';
             }
         }
 
-        return $this->name . ': ' . strtr($message, $replace);
+        return $this->name . ': ' . strtr($message, $replacements);
     }
 }
